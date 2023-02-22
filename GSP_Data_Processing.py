@@ -1,5 +1,4 @@
-# created by Florian Markus Bednarski
-# fteichmann@cbs.mpg.de
+#@author: Florian Bednarski (fteichmann@cbs.mpg.de)
 
 # This code processes the raw data from the eye-tracker into five dictionaries:
 #
@@ -20,7 +19,9 @@ import numpy as np
 import math
 
 
-# define function to get fixations
+#define function to get fixations
+#this is from the PyTrack project (https://github.com/titoghose/PyTrack)
+
 def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25):
     # empty list to contain data
     Sfix = []
@@ -43,7 +44,6 @@ def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25):
             # end the current fixation
             fixstart = False
             # only store the fixation if the duration is ok
-
             if abs(time[i - 1] - Sfix[-1][0]) >= mindur:
                 Efix.append([Sfix[-1][0], time[i - 1], time[i - 1] - Sfix[-1][0], x[si], y[si]])
             # delete the last fixation start if it was too short
@@ -56,21 +56,22 @@ def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25):
     return Sfix, Efix
 
 # load csv files for one participant and define names for trials and phases
+# so far you can only process one participant in one condition of the gaze scratch paradigm at a time
+
 # globals vars
 phases = ["baseline", "contingent", "disruption"]
 set(phases)
-# pass the file path
-
 ID = 'ID_52b'       ##ID to ensure proper storage of csv exports
 Condition = 'Rise'  ##Condition for Rise/Drop Trials
-data_path = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/GSP_Data_Infants_2022/' + ID + '/rise/'
+
+# pass the file path
+data_path = '' #insert path to data files
 
 files_GSP = os.listdir(data_path)
 trial_names = [trial_fn.split("_")[0] for trial_fn in files_GSP]
 trial_names = np.array(sorted(trial_names, key=lambda x: [0]))
 trial_names = trial_names.tolist()
 print(trial_names)
-
 
 
 # Split Raw Data into trials and phases and write in nested dictionary
@@ -85,6 +86,7 @@ for trial_fn in files_GSP:
     trial_data = pd.read_csv(os.path.join(data_path, trial_fn))
 
     # Divide data into the three phases (baseline/contingent/disruption) of the experiment
+    # make sure the timing is correct and matches you trial design
     trial_data_baseline = trial_data.loc[(trial_data['time'] > 4) & (trial_data['time'] < 9)].reset_index(drop=True)
     trial_data_disruption = trial_data.loc[(trial_data['time'] > trial_data['time'].iloc[-1]-5)].reset_index(drop=True)
     trial_data_contingent = trial_data.loc[(trial_data['time'] > trial_data_baseline['time'].iloc[-1]) & (trial_data['time'] < trial_data_disruption['time'].iloc[0])].reset_index(drop=True)
@@ -105,6 +107,8 @@ for trial_name in trial_names:  # ~ trial_phase_data.keys():
 
 
 ###sampling rate 120hz / sampling lenght 8.3333ms
+#we pre-registered inclusion criteria for each trial
+
 ###Check Inclusion Criteria Baseline (LT > 1s)
 for trial_name in trial_names:
     for phase in phases[:1]:
@@ -116,6 +120,7 @@ for trial_name in trial_names:
         else:
             print('Inclusion Criteria matched.')
             print(f"Trial name: '{trial_name}' | Phase: '{phase}':\n")
+
 ###Check Inclusion Criteria Contingent (LT > 10s)
 for trial_name in trial_names:
     for phase in phases[1:2]:
@@ -150,22 +155,15 @@ for trial_name in trial_names:  # ~ trial_phase_data.keys():
         x = df_temp.iloc[:, 1].tolist()
         y = df_temp.iloc[:, 2].tolist()
         time = df_temp.iloc[:, 0].tolist()
-        #x = [a / 1280.0 for a in x]
-        #y = [b / 1024.0 for b in y]
         y = [1024 - a for a in y]
-        sfix, efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25) #maxdist=0.025, mindur=0.05)
+        sfix, efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25)
 
         # write fixations in pandas dataframe with labels for columns
-
         df_efix = pd.DataFrame(columns=['Start', 'End', 'Duration', 'X', 'Y'])
 
         for ef in efix:
             ef_series = pd.Series(ef, index=df_efix.columns)
-            #print(ef_series)
-            # df_efix = df_efix.concat(ef_series, ignore_index=True)
-            #df_efix = pd.concat([df_efix, ef_series])
             df_efix = pd.concat([df_efix, ef_series.to_frame().T], ignore_index=True)
-            #print(df_efix)
         # append fixation dictionary
         fixation_data[trial_name][phase] = df_efix  # efix has the format ['Start','End','Duration', 'X', 'Y']
 
@@ -224,21 +222,17 @@ for trial_name in trial_names:  # ~ trial_phase_data.keys():
         x = df_temp.iloc[:, 1].tolist()
         y = df_temp.iloc[:, 2].tolist()
         time = df_temp.iloc[:, 0].tolist()
-        #x = [a / 1280.0 for a in x]
-        #y = [b / 1024.0 for b in y]
         y = [1024 - a for a in y]
 
-        sfix, efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25) #maxdist=0.025, mindur=0.05)
+        sfix, efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25)
 
         # write fixations in pandas dataframe with labels for columns
-
         df_efix = pd.DataFrame(columns=['Start', 'End', 'Duration', 'X', 'Y'])
 
         for ef in efix:
             ef_series = pd.Series(ef, index=df_efix.columns)
-
             df_efix = pd.concat([df_efix, ef_series.to_frame().T], ignore_index=True)
-            #print(df_efix)
+
         # append fixation dictionary
         fixation_data_drop[trial_name][phase]["drop"] = df_efix  # efix has the format ['Start','End','Duration', 'X', 'Y']
 
@@ -251,18 +245,15 @@ for trial_name in trial_names:  # ~ trial_phase_data.keys():
         x = df_temp.iloc[:, 1].tolist()
         y = df_temp.iloc[:, 2].tolist()
         time = df_temp.iloc[:,0].tolist()
-        #x = [a / 1280.0 for a in x]
-        #y = [b / 1024.0 for b in y]
         y = [1024 - a for a in y]
 
 
-        sfix , efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25) #maxdist=0.025, mindur=0.05)
+        sfix , efix = fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=0.25)
 
         # write fixations in pandas dataframe with labels for columns
         df_efix = pd.DataFrame(columns=['Start', 'End', 'Duration', 'X', 'Y'])
         for ef in efix:
             ef_series = pd.Series(ef, index=df_efix.columns)
-
             df_efix = pd.concat([df_efix, ef_series.to_frame().T], ignore_index=True)
         #append fixation dictionary
         fixation_data_rise[trial_name][phase]["rise"] = df_efix  # efix has the format ['Start','End','Duration', 'X', 'Y']
@@ -286,15 +277,10 @@ for trial_name in trial_names:  # ~ trial_phase_data.keys():  (Note: python list
 # fixation_data_drop: contains only fixation data for AOI drop
 # fixation_data_rise: contains only fixation data for AOI rise
 
-####SAVE TO CSV####
-
-
 
 ###
 ###Calculate Parameters DLS, sum, mean and std for duration for baseline phase
 ###
-
-
 
 
 # Dataframe with Sum of Duration in AOI-rise per Trial
@@ -353,12 +339,13 @@ df_rise['DLS'] = (df_rise['Duration_Rise'] - df_rise['Duration_Drop']) / df_rise
 df_rise['Condition'] = Condition
 print(df_rise)
 
-path = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Duration_Baseline/'
-#df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Baseline.csv', sep = ',')
+####SAVE TO CSV####
+path = '' #insert path
+df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Baseline.csv', sep = ',')
 
 ##Export Fixation Data to csv files per child, trial and phase
 
-path_fixation_overall = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Fixation_Baseline/Overall/'
+path_fixation_overall = '' #insert path
 
 trial = []
 
@@ -370,15 +357,13 @@ for n in trial_names:
             df_fix_temp = fixation_data[trial_name][phase].copy()
             df_fix = pd.concat([df_fix, df_fix_temp], ignore_index=True)
             df_fix['Trial'] = trial_name
-            #df_fix.to_csv(path_fixation_overall + 'baseline_fixation_' + ID + '_' + Condition + '_' + trial_name + '.csv', sep = ',')
+            df_fix.to_csv(path_fixation_overall + 'baseline_fixation_' + ID + '_' + Condition + '_' + trial_name + '.csv', sep = ',')
             n += str(1)
-
 
 
 ###
 ###Calculate Parameters DLS, sum, mean and std for duration for contingent phase
 ###
-
 
 
 # Dataframe with Sum of Duration in AOI-rise per Trial
@@ -438,12 +423,12 @@ df_rise['DLS'] = (df_rise['Duration_Rise'] - df_rise['Duration_Drop']) / df_rise
 df_rise['Condition'] = Condition
 print(df_rise)
 
-path = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Duration_Contingent/'
-#df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Contingent.csv', sep = ',')
+path = '' #insert path
+df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Contingent.csv', sep = ',')
 
 ##Export Fixation Data to csv files per child, trial and phase
 
-path_fixation_overall = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Fixation_Contingent/Overall/'
+path_fixation_overall = '' #insert path
 
 trial = []
 
@@ -455,7 +440,7 @@ for n in trial_names:
             df_fix_temp = fixation_data[trial_name][phase].copy()
             df_fix = pd.concat([df_fix, df_fix_temp], ignore_index=True)
             df_fix['Trial'] = trial_name
-            #df_fix.to_csv(path_fixation_overall + 'contingent_fixation_' + ID + '_' + Condition + '_' + trial_name + '.csv', sep = ',')
+            df_fix.to_csv(path_fixation_overall + 'contingent_fixation_' + ID + '_' + Condition + '_' + trial_name + '.csv', sep = ',')
             n += str(1)
 
 
@@ -463,7 +448,6 @@ for n in trial_names:
 ###
 ###Calculate Parameters DLS, sum, mean and std for duration for disruption phase
 ###
-
 
 
 # Dataframe with Sum of Duration in AOI-rise per Trial
@@ -522,12 +506,12 @@ df_rise['DLS'] = (df_rise['Duration_Rise'] - df_rise['Duration_Drop']) / df_rise
 df_rise['Condition'] = Condition
 print(df_rise)
 
-path = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Duration_Disruption/'
-#df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Disruption.csv', sep = ',')
+path = '' #insert path
+df_rise.to_csv(path + 'DUR_' + ID + '_' + Condition + '_' + 'Disruption.csv', sep = ',')
 
 ##Export Fixation Data to csv files per child, trial and phase
 
-path_fixation_overall = '/Users/florianteichmann/Desktop/Gaze_Scratch_Paradigm/Data_Processing_Fixation/Overall_AOI/Rise/'
+path_fixation_overall = '' #insert path
 
 trial = []
 
@@ -542,3 +526,4 @@ for n in trial_names:
             if len(df_fix) != 0:
                 df_fix.to_csv(path_fixation_overall + 'disruption_fixation_' + ID + '_' + Condition + '_' + trial_name + '.csv', sep = ',')
             n += str(1)
+
