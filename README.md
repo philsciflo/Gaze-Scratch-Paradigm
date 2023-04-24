@@ -12,7 +12,7 @@ In this repository you can find all materials required to replicate the gaze scr
 The gaze scratch paradigm is a gaze-contingent eye tracking paradigm. 
 The design has been developed at the [Max Planck Institute for Human Cognitive and Brain Sciences](https://www.cbs.mpg.de/en) in Leipzig. 
 
-The data uploaded here is from a first sample of 45 infants (6-10 months-old). 
+The data shared via OSF is from a first sample of 45 infants (6-10 months-old). 
 Parents were informed about the publication of the data and agreed by written consent to the anonymized publication. 
 If you plan on working with the experimental code, analysis script or data please do not hesistate to get in touch. 
 The purpose of this project always was to inspire furture research and motivate replication attempts!
