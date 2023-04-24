@@ -38,7 +38,7 @@ Establishing compatibility with other eye tracking systems should be possible as
 The analysis `code` was used to process the gaze data collected with the gaze scratch paradigm. 
 This script should help you to process gaze points, filter fixations and manage data according to participants and trials.
   
-### Visual and auditory stimuli 
+### Visual and auditory stimuli to be downloaded from OSF
 `./Stimuli`
 
 The visual and auditory stimuli were used in the gaze scratch paradigm. 
@@ -49,7 +49,7 @@ Those images, short videos and sound files are free to use, and we hope interest
 - attention getter videos
 - audio files
 
-### Data
+### Data to be downloaded from OSF
 `./Data`
 
 The `data` was collected from 45 infants at the [Max Planck Institute for Human Cognitive and Brain Sciences](https://www.cbs.mpg.de/en) in Leipzig. 
