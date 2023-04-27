@@ -7,28 +7,26 @@ with tobii SDK) on a Windows operating system (Windows 7 and up).
 If you want to run this experiment with your own stimuli you will have to change the script in some places,
 and you might have to adjust the timing.
 
+Stimulus data can be downloaded from OSF, see link in README.md
+Alternatively, use the download_study_data() in GSP_Data_Processing.py to download the data.
+
 Author:  Florian Bednarski
 Contact: fteichmann[at]cbs.mpg.de
 Years:   2021-2023
 """
 
 # %% Import
-import glob
-import os
+from pathlib import Path
 import time
 from time import perf_counter
 import tkinter as tk
 import tobii_research as tr
 from PIL import Image, ImageTk
-import imageio
-import threading
 import math
 import pygame
 import csv
 import vlc
-import itertools
 import pandas as pd
-import sys
 import mss
 
 # %% Set global vars & paths  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -37,38 +35,33 @@ import mss
 # Those files need to be stored in individual folders and named correctly.
 # If you download the stimuli from the repository the naming and folder structure should be correct.
 
+# Stimuli
+PATH_TO_STIMULI = Path("Stimuli")  # ADJUST PATH TO STIMULI IF REQUIRED
+
 # List of attention getter videos
-# attention_path = # insert path to attention getter files#
-attention_video = ['Candy.mp4', 'Rainbow.mp4', 'Star.mp4', 'Sun.mp4']
-# attention_video = os.listdir(attention_path)
+attention_path = PATH_TO_STIMULI.joinpath("Attention")
+attention_videos = list(attention_path.glob("*.mp4"))
+attention_videos = sorted(attention_videos, key=lambda x: x.name)
+# ['Candy.mp4', 'Rainbow.mp4', 'Star.mp4', 'Sun.mp4']
 
 # List of videos for baseline and transition to contingent phase
-trial_video = [
-    '1sand_drop.m4v', '2grass_rise.m4v', '3sky_drop.m4v', '4stars_rise.m4v', '5beach_drop.m4v',
-    '6lawn_rise.m4v', '7heaven_drop.m4v', '8night_rise.m4v', '9earth_drop.m4v', '10meadow_rise.m4v',
-    '11cloud_drop.m4v', '12dream_rise.m4v', '13play_drop.m4v', '14toy_rise.m4v', '15blue_drop.m4v',
-    '16space_rise.m4v',
-    '17sand_rise.m4v', '18grass_drop.m4v', '19sky_rise.m4v', '20stars_drop.m4v',
-    '21beach_rise.m4v', '22lawn_drop.m4v', '23heaven_rise.m4v', '24night_drop.m4v', '25earth_rise.m4v',
-    '26meadow_drop.m4v', '27cloud_rise.m4v', '28dream_drop.m4v', '29play_rise.m4v', '30toy_drop.m4v',
-    '31blue_rise.m4v', '32space_drop.m4v']
-# video_path = #insert path to video files#
-# trial_video = os.listdir(video_path)
+video_path = PATH_TO_STIMULI.joinpath("trial_video")
+trial_videos = list(video_path.glob("*.m4v"))
+
+
+# Sort videos in correct order
+def idx_first_char(x):
+    return [i for i, ltr in enumerate(x.name) if not ltr.isdigit()][0]
+
+
+trial_videos = sorted(trial_videos, key=lambda x: int(x.name[:idx_first_char(x)]))
+# ['1sand_drop.m4v', '2grass_rise.m4v', '3sky_drop.m4v', ..., '31blue_rise.m4v', '32space_drop.m4v']
 
 # List of images shown in contingent phase
-trial_images = [
-    '1sand_drop.png', '2grass_rise.png', '3sky_drop.png', '4stars_rise.png', '5beach_drop.png',
-    '6lawn_rise.png', '7heaven_drop.png', '8night_rise.png', '9earth_drop.png', '10meadow_rise.png',
-    '11cloud_drop.png', '12dream_rise.png', '13play_drop.png', '14toy_rise.png', '15blue_drop.png',
-    '16space_rise.png',
-    '17sand_rise.png', '18grass_drop.png', '19sky_rise.png', '20stars_drop.png',
-    '21beach_rise.png', '22lawn_drop.png', '23heaven_rise.png', '24night_drop.png', '25earth_rise.png',
-    '26meadow_drop.png', '27cloud_rise.png', '28dream_drop.png', '29play_rise.png', '30toy_drop.png',
-    '31blue_rise.png', '32space_drop.png']
-
-
-# images_path = #insert path to image files#
-# trial_images = os.listdir(images_path)
+images_path = PATH_TO_STIMULI.joinpath("trial_image")
+trial_images = list(images_path.glob("*.png"))
+trial_images = sorted(trial_images, key=lambda x: int(x.name[:idx_first_char(x)]))
+# ['1sand_drop.png', '2grass_rise.png', '3sky_drop.png', ..., '31blue_rise.png', '32space_drop.png']
 
 
 # %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -82,8 +75,12 @@ class App:
         self.root = tk.Tk()
         # Load trial image
         self.trial_img = trial_images[image_idx]
-        self.attention_video = attention_video[video_attention_idx]
-        self.trial_video = trial_video[video_trial_idx]
+        self.attention_video = attention_videos[video_attention_idx]
+        self.trial_video = trial_videos[video_trial_idx]
+        self.trial_idx = trial_idx
+        self.child_idx = child_idx
+
+        self.new_image = None  # init
 
         self.w_screen = 1280  # adjust to your screen
         self.h_screen = 1024  # adjust to your screen
@@ -100,7 +97,9 @@ class App:
 
         self.time_start = perf_counter()
         self.time_end = 0
-        self.time_at_scratching_end = None
+        self.time_at_scratching_end = None  # init
+        self.time_at_fill_image = None  # init
+        self.time_at_base_line = None  # init
 
         # connect to tobii tracker - this might change if you are using another eye tracking system
         tr.find_all_eyetrackers()
@@ -148,7 +147,7 @@ class App:
 
         self.write_data()
 
-        # in the following several function are defined which have specific tasks but all are called in the
+        # Next, several function are defined which have specific tasks but all are called in the
 
     # main loop above
     # first we define how to and where to write the data (you might want to adjust this to you own needs
@@ -161,17 +160,17 @@ class App:
 
         # First the gaze data in the tobii coordinate system (0/0 top left corner of the screen
         # and 1/1 bottom right corner of the screen)
-        file_tobii = str(trial_idx) + "_" + str(child_idx) + \
-                     "#define some specification#" + self.trial_img.split(".")[0]
+        file_tobii = (str(self.trial_idx) + "_" + str(self.child_idx) +
+                      "#define some specification#" + self.trial_img.name.split(".")[0])
         print(file_tobii)
 
         # Second the gaze data matching the dimensions of your screen
-        file_screen = str(trial_idx) + "_" + str(child_idx) + \
-                      "#define some specification#" + self.trial_img.split(".")[0]
+        file_screen = (str(self.trial_idx) + "_" + str(self.child_idx) +
+                       "#define some specification#" + self.trial_img.name.split(".")[0])
         print(file_screen)
         # Third the global tobii everything at once file
-        file_global = str(trial_idx) + "_" + str(child_idx) + \
-                      "#define some specification#" + self.trial_img.split(".")[0]
+        file_global = (str(self.trial_idx) + "_" + str(self.child_idx) +
+                       "#define some specification#" + self.trial_img.name.split(".")[0])
         print(file_global)
 
         # This collects the global data
@@ -196,15 +195,7 @@ class App:
             for t, rx, lx in self.co_ordinate_list:
                 writer_b.writerow({'time': t, 'gaze_point_x': rx, 'gaze_point_y': lx})
 
-    def key(self, event):
-        """Start the eye tracker manually. This is not really needed but nice to test equipment."""
-        if event.char == 't':
-            self.my_eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, self.gaze_data_callback,
-                                            as_dictionary=True)
-        if event.char == 's':
-            self.my_eyetracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, self.gaze_data_callback)
-
-    def close_win(self, e):
+    def close_win(self):  # , e)
         """Kill the experiment once it is running."""
         self.root.destroy()
 
@@ -228,8 +219,7 @@ class App:
 
     def catch_video(self):
         """Start the attention getter video."""
-        video = self.attention_video
-        m = self.Instance.media_new(str(video))
+        m = self.Instance.media_new(str(self.attention_video))
         self.player.set_media(m)
         h = self.videopanel.winfo_id()
         self.player.set_hwnd(h)
@@ -238,8 +228,7 @@ class App:
 
     def phase_video(self):
         """Start the transition phase video."""
-        video = self.trial_video
-        m = self.Instance.media_new(str(video))
+        m = self.Instance.media_new(str(self.trial_video))
         self.player.set_media(m)
         h = self.videopanel.winfo_id()
         self.player.set_hwnd(h)
@@ -270,17 +259,7 @@ class App:
                 self.blocks[(x1, y1)] = self.canvas.create_rectangle(x1, y1, x2, y2, fill=cols[color])
         self.n_blocks = len(self.blocks)
 
-    def gaze_data_callback_baseline(self, gaze_data):
-        """
-        Baseline et function
-
-        IMPORTANT:
-        Data collection start with the onset of the trial,
-        but we first show a welcome image and then an attention getter.
-        This needs to be adjusted for in the data processing
-
-        :param gaze_data: ...
-        """
+    def _gaza_data_callback_base(self, gaze_data):
         self.global_gaze_data.append(gaze_data)
         self.lx = gaze_data['left_gaze_point_on_display_area'][0]
         self.ly = gaze_data['left_gaze_point_on_display_area'][1]
@@ -295,6 +274,19 @@ class App:
         rx = (self.lx + ((self.rx - self.lx) / 2)) * self.w_screen
         lx = (self.ly + ((self.ry - self.ly) / 2)) * self.h_screen
         self.co_ordinate_list.append((perf_counter(), rx, lx))
+
+    def gaze_data_callback_baseline(self, gaze_data):
+        """
+        Baseline et function
+
+        IMPORTANT:
+        Data collection start with the onset of the trial,
+        but we first show a welcome image and then an attention getter.
+        This needs to be adjusted for in the data processing
+
+        :param gaze_data: ...
+        """
+        self._gaza_data_callback_base(gaze_data=gaze_data)
 
         self.time_at_base_line = time.perf_counter() - self.time_start
 
@@ -311,19 +303,8 @@ class App:
 
         :param gaze_data: ...
         """
-        self.global_gaze_data.append(gaze_data)
-        self.lx = gaze_data['left_gaze_point_on_display_area'][0]
-        self.ly = gaze_data['left_gaze_point_on_display_area'][1]
-        self.rx = gaze_data['right_gaze_point_on_display_area'][0]
-        self.ry = gaze_data['right_gaze_point_on_display_area'][1]
-        self.time = gaze_data['device_time_stamp']
-        # Get data and write to list
-        self.data_gaze.append((self.time, self.lx, self.rx, self.ly, self.ry))
 
-        # Convert eye-tracker data to screen
-        rx = (self.lx + ((self.rx - self.lx) / 2)) * self.w_screen
-        lx = (self.ly + ((self.ry - self.ly) / 2)) * self.h_screen
-        self.co_ordinate_list.append((perf_counter(), rx, lx))
+        self._gaza_data_callback_base(gaze_data=gaze_data)
 
         # Set condition on when to move to disruption phase
         # Here either 30second or until 20% of blocks removed
@@ -345,19 +326,23 @@ class App:
             self.time_end = perf_counter()
 
             # Take screenshot of scratch result
-            with mss.mss() as sct:
-                monitor_number = 1
-                mon = sct.monitors[monitor_number]
-                output = f"Screenshot_Contingent{self.trial_img.split('.')[0]}_{str(child_idx)}_" \
-                         f"{str(trial_idx)}.png"
-                monitor = {"top": mon["top"], "left": mon["left"],
-                           "width": mon["width"], "height": mon["height"], "mon": monitor_number}
-                sct_img = sct.grab(monitor)
-                mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
+            self.take_screenshot(phase="Contingent")
 
             # Start disruption phase
             self.my_eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA,
                                             self.gaze_data_callback_disruption, as_dictionary=True)
+
+    def take_screenshot(self, phase: str):
+        """Take screenshot of the current screen."""
+        with mss.mss() as sct:
+            monitor_number = 1
+            mon = sct.monitors[monitor_number]
+            output = f"Screenshot_{phase.title()}{self.trial_img.name.split('.')[0]}_" \
+                     f"{str(self.child_idx)}_{str(self.trial_idx)}.png"
+            monitor = {"top": mon["top"], "left": mon["left"],
+                       "width": mon["width"], "height": mon["height"], "mon": monitor_number}
+            sct_img = sct.grab(monitor)
+            mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
 
     def gaze_data_callback_disruption(self, gaze_data):
         """
@@ -365,20 +350,7 @@ class App:
 
         Data collections start when this function is called by 'def gaze_data_callback_contingent'.
         """
-        self.global_gaze_data.append(gaze_data)
-        self.lx = gaze_data['left_gaze_point_on_display_area'][0]
-        self.ly = gaze_data['left_gaze_point_on_display_area'][1]
-        self.rx = gaze_data['right_gaze_point_on_display_area'][0]
-        self.ry = gaze_data['right_gaze_point_on_display_area'][1]
-        self.time = gaze_data['device_time_stamp']
-
-        # Get data and write to list
-        self.data_gaze.append((self.time, self.lx, self.rx, self.ly, self.ry))
-
-        # Convert eye-tracker data to screen
-        rx = (self.lx + ((self.rx - self.lx) / 2)) * self.w_screen
-        lx = (self.ly + ((self.ry - self.ly) / 2)) * self.h_screen
-        self.co_ordinate_list.append((perf_counter(), rx, lx))
+        self._gaza_data_callback_base(gaze_data=gaze_data)
 
         self.time_end = perf_counter()
         if self.time_end - self.time_at_scratching_end > 5:
@@ -387,16 +359,7 @@ class App:
                                                 self.gaze_data_callback_disruption)
 
             # Take screenshot of disruption result
-            with mss.mss() as sct:
-                monitor_number = 1
-                mon = sct.monitors[monitor_number]
-                output = f"Screenshot_Disruption{self.trial_img.split('.')[0]}_{str(child_idx)}_" \
-                         f"{str(trial_idx)}.png"
-                monitor = {"top": mon["top"], "left": mon["left"],
-                           "width": mon["width"], "height": mon["height"],
-                           "mon": monitor_number}
-                sct_img = sct.grab(monitor)
-                mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
+            self.take_screenshot(phase="Disruption")
 
             # End trial after 3 seconds
             self.canvas.destroy()
@@ -433,36 +396,37 @@ if __name__ == "__main__":
     # Simply put in the numbers referring to images, videos and sound you want to play in the trial
     # REMEMBER python counts from 0 onwards not 1
 
-    trial_idx = input(f"Type number of trial: ")
-    if trial_idx.isnumeric():
-        trial_idx = int(trial_idx)
+    tr_idx = input(f"Type number of trial: ")
+    if tr_idx.isnumeric():
+        tr_idx = int(tr_idx)
 
-    child_idx = input(f"Type number of child: ")
-    if child_idx.isnumeric():
-        child_idx = int(child_idx)
+    ch_idx = input(f"Type number of child: ")
+    if ch_idx.isnumeric():
+        ch_idx = int(ch_idx)
 
-    video_attention_idx = input(f"Type number of attention video (0-{len(attention_video)}): ")
-    if video_attention_idx.isnumeric():
-        video_attention_idx = int(video_attention_idx)
+    vid_attention_idx = input(f"Type number of attention video (0-{len(attention_videos) - 1}): ")
+    if vid_attention_idx.isnumeric():
+        vid_attention_idx = int(vid_attention_idx)
     else:
-        print(f"Given number '{video_attention_idx}' not understood!")
+        print(f"Given number '{vid_attention_idx}' not understood!")
 
-    img_idx = input(f"Type number of trial image (0-{len(trial_images)}): ")
+    img_idx = input(f"Type number of trial image (0-{len(trial_images) - 1}): ")
     if img_idx.isnumeric():
         img_idx = int(img_idx)
     else:
         print(f"Given number '{img_idx}' not understood!")
 
-    video_trial_idx = input(f"Type number of trial video (0-{len(trial_video)}): ")
-    if video_trial_idx.isnumeric():
-        video_trial_idx = int(video_trial_idx)
+    vid_trial_idx = input(f"Type number of trial video (0-{len(trial_videos) - 1}): ")
+    if vid_trial_idx.isnumeric():
+        vid_trial_idx = int(vid_trial_idx)
     else:
-        print(f"Given number '{video_trial_idx}' not understood!")
+        print(f"Given number '{vid_trial_idx}' not understood!")
 
     print(f"Run image number {img_idx}")
-    print(f"Run attention video number {video_attention_idx}")
-    print(f"Run trial video number {video_trial_idx}")
+    print(f"Run attention video number {vid_attention_idx}")
+    print(f"Run trial video number {vid_trial_idx}")
 
-    app = App(img_idx, video_attention_idx, video_trial_idx, trial_idx, child_idx)
+    app = App(image_idx=img_idx, video_attention_idx=vid_attention_idx, video_trial_idx=vid_trial_idx,
+              trial_idx=tr_idx, child_idx=ch_idx)
 
 #  o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
