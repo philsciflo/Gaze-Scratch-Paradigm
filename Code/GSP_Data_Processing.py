@@ -32,14 +32,12 @@ ID: str = "ID_52b"  # subject ID
 CONDITION: str = "Rise"  # condition for Rise/Drop Trials
 
 # Pass the file path
-DATA_PATH: str = ""  # INSERT PATH TO DATA FILES IF REQUIRED
+DATA_ROOT_PATH: str = "Data"  # INSERT PATH TO DATA FILES IF REQUIRED
 SAVE_PATH_DF_RISE: str = ""  # INSERT PATH TO SAVE DF
 SAVE_PATH_FIXATION_OVERALL: str = ""  # INSERT PATH TO SAVE FIXATION OVERALL
 
 # Globals vars
 PHASES = ["baseline", "contingent", "disruption"]
-FILES_GSP = os.listdir(DATA_PATH)
-TRIAL_NAMES = sorted([trial_fn.split("_")[0] for trial_fn in FILES_GSP])
 
 
 # %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -157,10 +155,10 @@ def compute_df_e_fix(current_df: pd.DataFrame) -> pd.DataFrame:
     return df_e_fix
 
 
-def compute_duration_rise(current_phase: str, fix_data_rise) -> pd.DataFrame:
+def compute_duration_rise(current_phase: str, fix_data_rise, trial_names) -> pd.DataFrame:
     duration_rise = []
     list_rise = []
-    for tr_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for tr_name in trial_names:  # ~ trial_phase_data.keys():
         df_duration_temp_ = fix_data_rise[tr_name][current_phase]["rise"].copy()
         duration = df_duration_temp_['Duration'].sum()
         _n = [tr_name, duration]
@@ -180,11 +178,11 @@ def compute_duration_rise(current_phase: str, fix_data_rise) -> pd.DataFrame:
     return _df_rise
 
 
-def compute_duration_drop(current_phase: str, fix_data_drop) -> pd.DataFrame:
+def compute_duration_drop(current_phase: str, fix_data_drop, trial_names) -> pd.DataFrame:
     # Dataframe with Sum of Duration in AOI-drop per Trial
     duration_drop = []
     list_drop = []
-    for tr_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for tr_name in trial_names:  # ~ trial_phase_data.keys():
         df_duration_temp = fix_data_drop[tr_name][current_phase]["drop"].copy()
         duration = df_duration_temp['Duration'].sum()
         _n = [tr_name, duration]
@@ -218,9 +216,9 @@ def add_drop_and_save(current_df_rise: pd.DataFrame, current_df_drop: pd.DataFra
         save_dir, f"DUR_{FLAGS.id}_{condition}_Baseline.csv"), sep=",")
 
 
-def df_fix_to_csv(current_phase: str, fix_data):
+def df_fix_to_csv(current_phase: str, fix_data, trial_names):
     """Saves Fixation Data to csv files per child, trial and phase"""
-    for tr_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for tr_name in trial_names:  # ~ trial_phase_data.keys():
         _df_fix = pd.DataFrame(columns=['Start', 'End', 'Duration', 'X', 'Y', 'Trial'])
         _df_fix_temp = fix_data[tr_name][current_phase].copy()
         _df_fix = pd.concat([_df_fix, _df_fix_temp], ignore_index=True)
@@ -232,15 +230,21 @@ def df_fix_to_csv(current_phase: str, fix_data):
 
 
 def main():
+
+    # Set paths
+    subject_data_path = os.path.join(DATA_ROOT_PATH, ID, CONDITION.lower())
+    files_gsp = os.listdir(subject_data_path)
+    trial_names = sorted([trial_fn.split("_")[0] for trial_fn in files_gsp])
+
     # Load csv files for one participant and define names for trials and PHASES.
     # So far you can only process one participant in one condition of the gaze scratch paradigm at a time
-    print("Trial names:\n", TRIAL_NAMES)
+    print("Trial names:\n", trial_names)
 
     # Split Raw Data into trials and PHASES and write in nested dictionary
     trial_phase_data = {}
-    for trial_name in TRIAL_NAMES:
+    for trial_name in trial_names:
         # Read whole trial data
-        trial_data = pd.read_csv(os.path.join(DATA_PATH, trial_name))
+        trial_data = pd.read_csv(os.path.join(subject_data_path, trial_name))
 
         # Divide data into the three PHASES (baseline/contingent/disruption) of the experiment
         # make sure the timing is correct and matches you trial design
@@ -260,7 +264,7 @@ def main():
         trial_phase_data[trial_name].update(dict(contingent=trial_data_contingent))
 
     # Clean Data per Trial and Phase (drop 'nan' values)
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         for phase in PHASES:
             trial_phase_data[trial_name][phase].dropna(inplace=True)
             trial_phase_data[trial_name][phase].reset_index(inplace=True, drop=True)
@@ -270,7 +274,7 @@ def main():
     # Check Inclusion Criteria
     th_dict = {'baseline': 1, 'contingent': 10, 'disruption': .5}  # in seconds
     for phase in PHASES:
-        for trial_name in TRIAL_NAMES:
+        for trial_name in trial_names:
             df = trial_phase_data[trial_name][phase]
             if len(df['time']) * ((1000 / 120) * 1000) < th_dict[phase]:
                 print('Inclusion Criteria not matched.')
@@ -283,7 +287,7 @@ def main():
     # Calculate Fixations per Trial and Phase and Store in new nested dictionary -fixation_data-
     fixation_data = deepcopy(trial_phase_data)  # deepcopy (!important for dict!  structure)
 
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         for phase in PHASES:
             df_temp = trial_phase_data[trial_name][phase]
             # Append fixation dictionary
@@ -291,7 +295,7 @@ def main():
             # _e_fix has the format ['Start','End','Duration', 'X', 'Y']
 
     # Description Dataset Fixations
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         for phase in PHASES:
             print(f"Trial name: '{trial_name}' | Phase: '{phase}':\n")
             print(len(fixation_data[trial_name][phase]))
@@ -309,7 +313,7 @@ def main():
     #   | (tp_df['gaze_point_x'] > 802) & (tp_df['gaze_point_y'] > 642)
 
     trial_phase_aoi_data = deepcopy(trial_phase_data)
-    for trial_name in TRIAL_NAMES:
+    for trial_name in trial_names:
         for phase in PHASES:
             tp_df = trial_phase_aoi_data[trial_name][phase]  # use short naming for code below
 
@@ -338,7 +342,7 @@ def main():
     # dictionary -fixation_data_drop-
     fixation_data_drop = deepcopy(trial_phase_aoi_data)  # deepcopy (!important for dict! structure)
 
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         for phase in PHASES:
             df_temp = trial_phase_aoi_data[trial_name][phase]["drop"]
             # append fixation dictionary
@@ -349,7 +353,7 @@ def main():
     # dictionary -fixation_data_rise-
     fixation_data_rise = deepcopy(trial_phase_aoi_data)  # deepcopy
 
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         for phase in PHASES:
             df_temp = trial_phase_aoi_data[trial_name][phase]["rise"]
             # Append fixation dictionary
@@ -358,7 +362,7 @@ def main():
 
     # This can be used to test dictionaries
     # *Note: You can iterate through trials and PHASES*
-    for trial_name in TRIAL_NAMES:
+    for trial_name in trial_names:
         # ~ trial_phase_data.keys():  (Note: python list's are ordered, keys, hence dicts aren't)\n",
         for phase in PHASES:  # ~ trial_phase_data[trial_name].keys():
             print(f"Trial name: '{trial_name}' | Phase: '{phase}':\n")
@@ -381,11 +385,13 @@ def main():
 
     # Dataframe with Sum of Duration in AOI-rise per Trial
     df_rise = compute_duration_rise(current_phase=PHASES[0],  # baseline phase
-                                    fix_data_rise=fixation_data_rise)
+                                    fix_data_rise=fixation_data_rise,
+                                    trial_names=trial_names)
 
     # Dataframe with Sum of Duration in AOI-drop per Trial
     df_drop = compute_duration_drop(current_phase=PHASES[0],
-                                    fix_data_drop=fixation_data_drop)
+                                    fix_data_drop=fixation_data_drop,
+                                    trial_names=trial_names)
 
     ###
     # Dataframe with Sum of Duration in AOI-rise + AOI-drop + total Duration + DLS per Trial
@@ -394,7 +400,7 @@ def main():
                       save_dir=SAVE_PATH_DF_RISE)
 
     # Export Fixation Data to csv files per child, trial and phase
-    df_fix_to_csv(current_phase=PHASES[0], fix_data=fixation_data)
+    df_fix_to_csv(current_phase=PHASES[0], fix_data=fixation_data, trial_names=trial_names)
 
     ###
     # Calculate Parameters DLS, sum, mean and std for duration for contingent phase
@@ -402,11 +408,13 @@ def main():
 
     # Dataframe with Sum of Duration in AOI-rise per Trial
     df_rise = compute_duration_rise(current_phase=PHASES[1],  # contingent phase
-                                    fix_data_rise=fixation_data_rise)
+                                    fix_data_rise=fixation_data_rise,
+                                    trial_names=trial_names)
 
     # Dataframe with Sum of Duration in AOI-drop per Trial
     df_drop = compute_duration_drop(current_phase=PHASES[1],
-                                    fix_data_drop=fixation_data_drop)
+                                    fix_data_drop=fixation_data_drop,
+                                    trial_names=trial_names)
 
     ###
     # Dataframe with Sum of Duration in AOI-rise + AOI-drop + total Duration + DLS per Trial
@@ -415,7 +423,7 @@ def main():
                       save_dir=SAVE_PATH_DF_RISE)
 
     # Export Fixation Data to csv files per child, trial and phase
-    df_fix_to_csv(current_phase=PHASES[1], fix_data=fixation_data)
+    df_fix_to_csv(current_phase=PHASES[1], fix_data=fixation_data, trial_names=trial_names)
 
     ###
     # Calculate Parameters DLS, sum, mean and std for duration for disruption phase
@@ -423,11 +431,13 @@ def main():
 
     # Dataframe with Sum of Duration in AOI-rise per Trial
     df_rise = compute_duration_rise(current_phase=PHASES[2],  # disruption phase
-                                    fix_data_rise=fixation_data_rise)
+                                    fix_data_rise=fixation_data_rise,
+                                    trial_names=trial_names)
 
     # Dataframe with Sum of Duration in AOI-drop per Trial
     df_drop = compute_duration_drop(current_phase=PHASES[2],  # disruption phase
-                                    fix_data_drop=fixation_data_drop)
+                                    fix_data_drop=fixation_data_drop,
+                                    trial_names=trial_names)
 
     ###
     # Dataframe with Sum of Duration in AOI-rise + AOI-drop + total Duration + DLS per Trial
@@ -437,7 +447,7 @@ def main():
 
     # Export Fixation Data to csv files per child, trial and phase
     phase = PHASES[2]
-    for trial_name in TRIAL_NAMES:  # ~ trial_phase_data.keys():
+    for trial_name in trial_names:  # ~ trial_phase_data.keys():
         df_fix = pd.DataFrame(columns=['Start', 'End', 'Duration', 'X', 'Y', 'Trial'])
         df_fix_temp = fixation_data_rise[trial_name][phase]["rise"].copy()
         df_fix = pd.concat([df_fix, df_fix_temp], ignore_index=True)
