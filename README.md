@@ -42,8 +42,18 @@ Establishing compatibility with other eye tracking systems should be possible as
 
 `./Code/GSP_Data_Processing.py`
 
-The analysis `code` was used to process the gaze data collected with the gaze scratch paradigm. 
+The analysis code was used to process the gaze data collected with the gaze scratch paradigm. 
 This script should help you to process gaze points, filter fixations and manage data according to participants and trials.
+
+OSF data can be downloaded with the following function: 
+```python
+download_study_data(stimuli_only=False, verbose=True)
+``` 
+
+Data processing can be done also via a shell/terminal:
+```bash
+python GSP_Data_Processing.py --id SUBJECT_ID --condition CONDITION
+```
   
 ### Visual and auditory stimuli to be downloaded from OSF
 `./Stimuli`
@@ -59,7 +69,7 @@ Those images, short videos and sound files are free to use, and we hope interest
 ### Data to be downloaded from OSF
 `./Data`
 
-The `data` was collected from 45 infants at the [Max Planck Institute for Human Cognitive and Brain Sciences](https://www.cbs.mpg.de/en) in Leipzig. 
+The data was collected from 45 infants at the [Max Planck Institute for Human Cognitive and Brain Sciences](https://www.cbs.mpg.de/en) in Leipzig. 
 This data is there for everyone to use. 
 If you want to check our work or perform further analyses be our guest! 
 We invite any one to advance this research and would be extremly greatful if you get in touch with any questions regarding this project.
