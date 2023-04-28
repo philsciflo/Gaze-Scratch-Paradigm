@@ -12,7 +12,7 @@ trial_phase_aoi_data: contains only gaze data for both AOIs separated into trial
 fixation_data_drop: contains only fixation data for AOI drop
 fixation_data_rise: contains only fixation data for AOI rise
 
-Author:  Florian Bednarski
+Author:  Florian Bednarski et al.
 Contact: fteichmann[at]cbs.mpg.de
 Years:   2021-2023
 """
@@ -42,7 +42,7 @@ PHASES = ["baseline", "contingent", "disruption"]
 
 # %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-def download_study_data(stimuli_only: bool, verbose: bool = False) -> None:
+def download_study_data(stimuli_only: bool, verbose: bool = True) -> None:
     """Download study data from OSF."""
     import shutil
     from urllib.request import urlretrieve
@@ -52,9 +52,7 @@ def download_study_data(stimuli_only: bool, verbose: bool = False) -> None:
     if verbose:
         print("Downloading data from OSF ...")
     fname, headers = urlretrieve(
-        url="https://files.de-1.osf.io/v1/resources/xrbzg/providers/osfstorage/"
-            "?view_only=13cf79f5e8eb47afab6982fb1731cd12&zip=",
-        # TODO update when OSF is public
+        url="https://files.de-1.osf.io/v1/resources/xrbzg/providers/osfstorage/?zip=",
         filename="osfstorage-archive.zip")
     if verbose:
         print(f"Data downloaded to '{fname}'.")

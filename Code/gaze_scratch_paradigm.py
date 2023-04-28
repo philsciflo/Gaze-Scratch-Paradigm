@@ -10,7 +10,7 @@ and you might have to adjust the timing.
 Stimulus data can be downloaded from OSF, see link in README.md
 Alternatively, use the download_study_data() in GSP_Data_Processing.py to download the data.
 
-Author:  Florian Bednarski
+Author:  Florian Bednarski et al.
 Contact: fteichmann[at]cbs.mpg.de
 Years:   2021-2023
 """
