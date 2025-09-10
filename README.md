@@ -103,4 +103,4 @@ Please be patient I will try to improve things along the way and am always happy
 ## Citation 
 In case you use this code or data please cite the following paper:
 
-... `[to be added]`
+Bednarski, F. M., Rothmaler, K., Hofmann, S. M., & Grosse Wiesmann, C. (2025). Infants in Control—Evidence for Agency in 6‐to 10‐Months‐Old Infants in a Gaze‐Contingent Eye Tracking Paradigm. Child Development.
